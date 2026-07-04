@@ -1,0 +1,38 @@
+{
+  "beds_mattresses": [
+    "bed bedroom furniture",
+    "bed in room",
+    "mattress bedroom",
+    "single bed room",
+    "double bed bedroom"
+  ],
+  "chair_seating": [
+    "chair room furniture",
+    "office chair",
+    "dining chair room",
+    "armchair living room",
+    "stool furniture"
+  ],
+  "sofa": [
+    "sofa living room",
+    "couch room",
+    "settee living room",
+    "sectional sofa",
+    "futon room"
+  ],
+  "storage": [
+    "wardrobe bedroom",
+    "storage cabinet room",
+    "chest of drawers",
+    "cupboard room",
+    "bookcase room",
+    "filing cabinet office"
+  ],
+  "tables_desks": [
+    "desk office",
+    "computer desk room",
+    "dining table room",
+    "coffee table living room",
+    "table furniture room"
+  ]
+}

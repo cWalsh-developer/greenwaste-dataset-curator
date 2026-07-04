@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "greenwaste-dataset-curator"
+version = "0.1.0"
+description = "Legally traceable image acquisition and curation tools for GreenWaste furniture detection datasets."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "imagehash>=4.3.1",
+  "pandas>=2.0.0",
+  "pillow>=10.0.0",
+  "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+yolo = ["ultralytics>=8.0.0"]
+dev = ["pytest>=8.0.0", "ruff>=0.5.0"]
+
+[project.scripts]
+greenwaste-curator = "greenwaste_dataset_curator.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
