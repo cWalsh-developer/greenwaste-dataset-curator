@@ -27,6 +27,21 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e .[dev]
 ```
 
+## Create the GitHub Remote
+
+This folder is already a local git repository. To publish it, create an empty GitHub repository named `greenwaste-dataset-curator`, then run:
+
+```powershell
+git remote add origin https://github.com/<your-username>/greenwaste-dataset-curator.git
+git push -u origin main
+```
+
+If GitHub CLI is installed and authenticated, this can be done in one step:
+
+```powershell
+gh repo create greenwaste-dataset-curator --private --source . --remote origin --push
+```
+
 For YOLO proposal generation:
 
 ```powershell
