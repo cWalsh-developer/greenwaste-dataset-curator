@@ -109,8 +109,8 @@ def test_quality_filter_reclassifies_single_detected_category(monkeypatch, tmp_p
     )
 
     monkeypatch.setattr(
-        "greenwaste_dataset_curator.quality.load_yolo_model",
-        lambda model_path: object(),
+        "greenwaste_dataset_curator.quality.load_yolo_models",
+        lambda model_paths: [object()],
     )
     monkeypatch.setattr(
         "greenwaste_dataset_curator.quality.detect_classes",
@@ -132,3 +132,47 @@ def test_quality_filter_reclassifies_single_detected_category(monkeypatch, tmp_p
     assert decisions[0].decision == "reclassify"
     assert decisions[0].original_category == "sofa"
     assert decisions[0].output_category == "beds_mattresses"
+
+
+def test_quality_filter_combines_multiple_model_detections(monkeypatch, tmp_path: Path) -> None:
+    path = tmp_path / "storage_folder_but_bed_model_finds_bed.jpg"
+    Image.new("RGB", (100, 100), "white").save(path)
+    record = make_record(path, "multi-model")
+    record = ImageRecord(
+        **{
+            **record.__dict__,
+            "category": "storage",
+        }
+    )
+    model_one = object()
+    model_two = object()
+
+    monkeypatch.setattr(
+        "greenwaste_dataset_curator.quality.load_yolo_models",
+        lambda model_paths: [model_one, model_two],
+    )
+
+    def fake_detect_classes(model, image_path, confidence, image_size):
+        if model is model_one:
+            return {"bed"}
+        return set()
+
+    monkeypatch.setattr(
+        "greenwaste_dataset_curator.quality.detect_classes",
+        fake_detect_classes,
+    )
+
+    accepted, rejected, decisions = quality_filter_records(
+        records=[record],
+        output_dir=tmp_path / "quality",
+        yolo_model_paths=[Path("bed_model.pt"), Path("storage_model.pt")],
+        require_target_object=True,
+        reclassify_mismatched_category=True,
+        copy_images=False,
+    )
+
+    assert rejected == []
+    assert len(accepted) == 1
+    assert accepted[0].category == "beds_mattresses"
+    assert decisions[0].detected_classes == "bed"
+    assert decisions[0].detected_categories == "beds_mattresses"

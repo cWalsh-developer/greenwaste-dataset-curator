@@ -121,14 +121,29 @@ def detect_classes(
     return classes
 
 
-def load_yolo_model(model_path: Path | None):
-    if model_path is None:
-        return None
+def load_yolo_models(model_paths: list[Path]) -> list:
+    if not model_paths:
+        return []
     try:
         from ultralytics import YOLO
     except ImportError as exc:  # pragma: no cover
         raise ImportError("Install YOLO support with: pip install -e .[yolo]") from exc
-    return YOLO(str(model_path))
+    return [YOLO(str(model_path)) for model_path in model_paths]
+
+
+def normalize_model_paths(
+    yolo_model_paths: Path | list[Path] | None,
+    yolo_model_path: Path | None,
+) -> list[Path]:
+    model_paths: list[Path] = []
+    if yolo_model_paths is not None:
+        if isinstance(yolo_model_paths, Path):
+            model_paths.append(yolo_model_paths)
+        else:
+            model_paths.extend(yolo_model_paths)
+    if yolo_model_path is not None:
+        model_paths.append(yolo_model_path)
+    return model_paths
 
 
 def non_photo_keyword(record: ImageRecord, keywords: set[str] | None = None) -> str | None:
@@ -169,6 +184,7 @@ def quality_filter_records(
     records: list[ImageRecord],
     output_dir: Path,
     yolo_model_path: Path | None = None,
+    yolo_model_paths: list[Path] | None = None,
     confidence: float = 0.25,
     image_size: int = 960,
     reject_person: bool = False,
@@ -181,7 +197,11 @@ def quality_filter_records(
     reclassify_mismatched_category: bool = False,
     copy_images: bool = False,
 ) -> tuple[list[ImageRecord], list[ImageRecord], list[QualityDecision]]:
-    yolo_model = load_yolo_model(yolo_model_path)
+    model_paths = normalize_model_paths(
+        yolo_model_paths=yolo_model_paths,
+        yolo_model_path=yolo_model_path,
+    )
+    yolo_models = load_yolo_models(model_paths)
     accepted: list[ImageRecord] = []
     rejected: list[ImageRecord] = []
     decisions: list[QualityDecision] = []
@@ -229,13 +249,16 @@ def quality_filter_records(
                     duplicate_of = accepted_record.local_path
                     break
 
-        if not reasons and yolo_model is not None:
-            detected_classes = detect_classes(
-                model=yolo_model,
-                image_path=image_path,
-                confidence=confidence,
-                image_size=image_size,
-            )
+        if not reasons and yolo_models:
+            for yolo_model in yolo_models:
+                detected_classes.update(
+                    detect_classes(
+                        model=yolo_model,
+                        image_path=image_path,
+                        confidence=confidence,
+                        image_size=image_size,
+                    )
+                )
             detected_categories = greenwaste_categories_from_classes(detected_classes)
             if reject_person and "person" in detected_classes:
                 reasons.append("contains_person")

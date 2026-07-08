@@ -71,7 +71,7 @@ def quality_filter(args: argparse.Namespace) -> None:
     accepted, rejected, decisions = quality_filter_records(
         records=records,
         output_dir=args.output_dir,
-        yolo_model_path=args.model,
+        yolo_model_paths=args.model,
         confidence=args.confidence,
         image_size=args.image_size,
         reject_person=args.reject_person,
@@ -138,8 +138,12 @@ def build_parser() -> argparse.ArgumentParser:
     quality.add_argument(
         "--model",
         type=Path,
-        default=None,
-        help="Optional YOLO model for semantic checks, e.g. yolo11n.pt",
+        action="append",
+        default=[],
+        help=(
+            "Optional YOLO model for semantic checks. Can be supplied more "
+            "than once, e.g. --model yolo11n.pt --model custom.pt"
+        ),
     )
     quality.add_argument("--confidence", type=float, default=0.25)
     quality.add_argument("--image-size", type=int, default=960)

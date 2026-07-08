@@ -95,6 +95,7 @@ manual annotation:
   --manifest dataset\commons_greenwaste\manifest.csv `
   --output-dir dataset\commons_greenwaste_quality `
   --model yolo11n.pt `
+  --model "D:\Green Waste\V1_GreenWaste\runs\detect\train_final_all_labelled_augmented_70ep_20260620\weights\last.pt" `
   --reject-person `
   --reject-non-photo `
   --require-target-object `
@@ -139,6 +140,10 @@ detected category in `accepted/` and updates `accepted_manifest.csv`. For
 example, a bed collected under `sofa` can be moved to `beds_mattresses`.
 Ambiguous images with multiple detected GreenWaste categories are rejected for
 manual review rather than automatically moved.
+
+You can pass `--model` more than once. This is useful when one model is better
+for beds/people and another model is better for GreenWaste-specific classes
+such as storage. The filter combines detections from all supplied models.
 
 If the non-photo filter is too aggressive, rerun with:
 
