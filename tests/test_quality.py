@@ -41,7 +41,7 @@ def test_quality_filter_rejects_near_duplicate_images(tmp_path: Path) -> None:
     zoomed = image.crop((10, 10, 90, 90)).resize((100, 100))
     zoomed.save(duplicate_path)
 
-    accepted, rejected, decisions = quality_filter_records(
+    accepted, review, rejected, decisions = quality_filter_records(
         records=[
             make_record(first_path, "one"),
             make_record(duplicate_path, "two"),
@@ -49,25 +49,55 @@ def test_quality_filter_rejects_near_duplicate_images(tmp_path: Path) -> None:
         output_dir=tmp_path / "quality",
         duplicate_phash_threshold=16,
         crop_duplicate_check=True,
+        near_duplicate_action="reject",
         copy_images=False,
     )
 
     assert len(accepted) == 1
+    assert review == []
     assert len(rejected) == 1
     assert decisions[1].decision == "reject"
     assert "near_duplicate" in decisions[1].reasons
 
 
+def test_quality_filter_sends_near_duplicates_to_review_by_default(tmp_path: Path) -> None:
+    first_path = tmp_path / "first.jpg"
+    duplicate_path = tmp_path / "duplicate.jpg"
+
+    image = Image.new("RGB", (100, 100), "white")
+    for x in range(25, 75):
+        for y in range(25, 75):
+            image.putpixel((x, y), (60, 90, 140))
+    image.save(first_path)
+    image.save(duplicate_path)
+
+    accepted, review, rejected, decisions = quality_filter_records(
+        records=[
+            make_record(first_path, "one"),
+            make_record(duplicate_path, "two"),
+        ],
+        output_dir=tmp_path / "quality",
+        duplicate_phash_threshold=16,
+        copy_images=False,
+    )
+
+    assert len(accepted) == 1
+    assert len(review) == 1
+    assert rejected == []
+    assert decisions[1].decision == "review"
+
+
 def test_quality_filter_rejects_missing_files(tmp_path: Path) -> None:
     missing_path = tmp_path / "missing.jpg"
 
-    accepted, rejected, decisions = quality_filter_records(
+    accepted, review, rejected, decisions = quality_filter_records(
         records=[make_record(missing_path, "missing")],
         output_dir=tmp_path / "quality",
         copy_images=False,
     )
 
     assert accepted == []
+    assert review == []
     assert len(rejected) == 1
     assert decisions[0].reasons == "unreadable_or_missing_file"
 
@@ -77,7 +107,7 @@ def test_quality_filter_rejects_non_photo_keyword(tmp_path: Path) -> None:
     Image.new("RGB", (100, 100), "white").save(path)
     record = make_record(path, "illustration")
 
-    accepted, rejected, decisions = quality_filter_records(
+    accepted, review, rejected, decisions = quality_filter_records(
         records=[record],
         output_dir=tmp_path / "quality",
         reject_non_photo=True,
@@ -86,6 +116,7 @@ def test_quality_filter_rejects_non_photo_keyword(tmp_path: Path) -> None:
     )
 
     assert accepted == []
+    assert review == []
     assert len(rejected) == 1
     assert decisions[0].decision == "reject"
     assert "non_photo_keyword:illustration" in decisions[0].reasons
@@ -117,7 +148,7 @@ def test_quality_filter_reclassifies_single_detected_category(monkeypatch, tmp_p
         lambda model, image_path, confidence, image_size: {"bed"},
     )
 
-    accepted, rejected, decisions = quality_filter_records(
+    accepted, review, rejected, decisions = quality_filter_records(
         records=[record],
         output_dir=tmp_path / "quality",
         yolo_model_path=Path("fake.pt"),
@@ -126,6 +157,7 @@ def test_quality_filter_reclassifies_single_detected_category(monkeypatch, tmp_p
         copy_images=False,
     )
 
+    assert review == []
     assert rejected == []
     assert len(accepted) == 1
     assert accepted[0].category == "beds_mattresses"
@@ -162,7 +194,7 @@ def test_quality_filter_combines_multiple_model_detections(monkeypatch, tmp_path
         fake_detect_classes,
     )
 
-    accepted, rejected, decisions = quality_filter_records(
+    accepted, review, rejected, decisions = quality_filter_records(
         records=[record],
         output_dir=tmp_path / "quality",
         yolo_model_paths=[Path("bed_model.pt"), Path("storage_model.pt")],
@@ -171,6 +203,7 @@ def test_quality_filter_combines_multiple_model_detections(monkeypatch, tmp_path
         copy_images=False,
     )
 
+    assert review == []
     assert rejected == []
     assert len(accepted) == 1
     assert accepted[0].category == "beds_mattresses"

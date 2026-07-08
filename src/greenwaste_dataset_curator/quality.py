@@ -163,7 +163,7 @@ def non_photo_keyword(record: ImageRecord, keywords: set[str] | None = None) -> 
     return None
 
 
-def looks_like_flat_art(image: Image.Image) -> bool:
+def looks_like_flat_art(image: Image.Image, strict: bool = False) -> bool:
     sample = image.convert("RGB")
     sample.thumbnail((160, 160))
 
@@ -176,6 +176,9 @@ def looks_like_flat_art(image: Image.Image) -> bool:
     edges = grayscale.filter(ImageFilter.FIND_EDGES)
     edge_mean = ImageStat.Stat(edges).mean[0] / 255.0
     channel_std = sum(ImageStat.Stat(sample).stddev) / 3.0
+
+    if strict:
+        return unique_ratio < 0.25 and edge_mean > 0.035 and channel_std < 90.0
 
     return unique_ratio < 0.08 and edge_mean > 0.06 and channel_std < 70.0
 
@@ -194,15 +197,21 @@ def quality_filter_records(
     crop_bit_error_rate: float = 0.25,
     reject_non_photo: bool = False,
     non_photo_visual_check: bool = True,
+    strict_non_photo_check: bool = False,
     reclassify_mismatched_category: bool = False,
+    near_duplicate_action: str = "review",
     copy_images: bool = False,
-) -> tuple[list[ImageRecord], list[ImageRecord], list[QualityDecision]]:
+) -> tuple[list[ImageRecord], list[ImageRecord], list[ImageRecord], list[QualityDecision]]:
+    if near_duplicate_action not in {"reject", "review"}:
+        raise ValueError("near_duplicate_action must be either 'reject' or 'review'")
+
     model_paths = normalize_model_paths(
         yolo_model_paths=yolo_model_paths,
         yolo_model_path=yolo_model_path,
     )
     yolo_models = load_yolo_models(model_paths)
     accepted: list[ImageRecord] = []
+    review: list[ImageRecord] = []
     rejected: list[ImageRecord] = []
     decisions: list[QualityDecision] = []
     accepted_hashes: list[tuple[ImageRecord, imagehash.ImageHash, imagehash.ImageMultiHash | None]] = []
@@ -223,7 +232,10 @@ def quality_filter_records(
                 keyword = non_photo_keyword(record)
                 if keyword is not None:
                     reasons.append(f"non_photo_keyword:{keyword}")
-                elif non_photo_visual_check and looks_like_flat_art(image):
+                elif non_photo_visual_check and looks_like_flat_art(
+                    image,
+                    strict=strict_non_photo_check,
+                ):
                     reasons.append("non_photo_visual_heuristic")
 
             phash_value = imagehash.phash(image)
@@ -277,8 +289,11 @@ def quality_filter_records(
                     else:
                         reasons.append("target_not_detected")
 
-        decision = "reject" if reasons else "accept"
-        if not reasons and output_category != record.category:
+        if reasons == ["near_duplicate"] and near_duplicate_action == "review":
+            decision = "review"
+        else:
+            decision = "reject" if reasons else "accept"
+        if decision == "accept" and output_category != record.category:
             decision = "reclassify"
 
         output_record = replace(record, category=output_category)
@@ -286,11 +301,15 @@ def quality_filter_records(
             copied_path = copy_record_image(
                 record=output_record,
                 output_dir=output_dir,
-                split_name="rejected" if reasons else "accepted",
+                split_name="review" if decision == "review" else (
+                    "rejected" if decision == "reject" else "accepted"
+                ),
             )
             output_record = replace(output_record, local_path=copied_path)
 
-        if reasons:
+        if decision == "review":
+            review.append(output_record)
+        elif decision == "reject":
             rejected.append(output_record)
         else:
             accepted.append(output_record)
@@ -316,4 +335,4 @@ def quality_filter_records(
             )
         )
 
-    return accepted, rejected, decisions
+    return accepted, review, rejected, decisions

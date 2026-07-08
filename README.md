@@ -98,9 +98,11 @@ manual annotation:
   --model "D:\Green Waste\V1_GreenWaste\runs\detect\train_final_all_labelled_augmented_70ep_20260620\weights\last.pt" `
   --reject-person `
   --reject-non-photo `
+  --strict-non-photo-check `
   --require-target-object `
   --reclassify-mismatched-category `
-  --duplicate-phash-threshold 12 `
+  --duplicate-phash-threshold 6 `
+  --near-duplicate-action review `
   --confidence 0.20
 ```
 
@@ -109,8 +111,10 @@ This creates:
 ```text
 dataset/commons_greenwaste_quality/
   accepted/
+  review/
   rejected/
   accepted_manifest.csv
+  review_manifest.csv
   rejected_manifest.csv
   quality_review.csv
 ```
@@ -144,6 +148,11 @@ manual review rather than automatically moved.
 You can pass `--model` more than once. This is useful when one model is better
 for beds/people and another model is better for GreenWaste-specific classes
 such as storage. The filter combines detections from all supplied models.
+
+Near-duplicates are sent to `review/` by default rather than `rejected/`. This
+is intentional: visually similar sofas, chairs, or room scenes may still be
+useful training examples. Only use `--near-duplicate-action reject` if you want
+to discard near-duplicates automatically.
 
 If the non-photo filter is too aggressive, rerun with:
 

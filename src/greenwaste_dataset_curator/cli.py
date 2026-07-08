@@ -68,7 +68,7 @@ def yolo_proposals(args: argparse.Namespace) -> None:
 
 def quality_filter(args: argparse.Namespace) -> None:
     records = read_image_manifest(args.manifest)
-    accepted, rejected, decisions = quality_filter_records(
+    accepted, review, rejected, decisions = quality_filter_records(
         records=records,
         output_dir=args.output_dir,
         yolo_model_paths=args.model,
@@ -81,13 +81,17 @@ def quality_filter(args: argparse.Namespace) -> None:
         crop_bit_error_rate=args.crop_bit_error_rate,
         reject_non_photo=args.reject_non_photo,
         non_photo_visual_check=not args.no_non_photo_visual_check,
+        strict_non_photo_check=args.strict_non_photo_check,
         reclassify_mismatched_category=args.reclassify_mismatched_category,
+        near_duplicate_action=args.near_duplicate_action,
         copy_images=not args.no_copy,
     )
     write_dataclass_csv(args.output_dir / "accepted_manifest.csv", accepted, ImageRecord)
+    write_dataclass_csv(args.output_dir / "review_manifest.csv", review, ImageRecord)
     write_dataclass_csv(args.output_dir / "rejected_manifest.csv", rejected, ImageRecord)
     write_dataclass_csv(args.output_dir / "quality_review.csv", decisions, QualityDecision)
     print(f"Accepted image(s): {len(accepted)}")
+    print(f"Review image(s): {len(review)}")
     print(f"Rejected image(s): {len(rejected)}")
     print(f"Quality review: {args.output_dir / 'quality_review.csv'}")
 
@@ -154,6 +158,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Only use source/filename keywords for non-photo rejection.",
     )
+    quality.add_argument(
+        "--strict-non-photo-check",
+        action="store_true",
+        help="Use a stronger visual heuristic for drawings/cartoons/renders.",
+    )
     quality.add_argument("--require-target-object", action="store_true")
     quality.add_argument(
         "--reclassify-mismatched-category",
@@ -164,6 +173,12 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     quality.add_argument("--duplicate-phash-threshold", type=int, default=10)
+    quality.add_argument(
+        "--near-duplicate-action",
+        choices=["review", "reject"],
+        default="review",
+        help="Send near-duplicates to review by default instead of rejecting them.",
+    )
     quality.add_argument("--no-crop-duplicate-check", action="store_true")
     quality.add_argument("--crop-bit-error-rate", type=float, default=0.25)
     quality.add_argument("--no-copy", action="store_true")
