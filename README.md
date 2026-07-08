@@ -96,6 +96,7 @@ manual annotation:
   --output-dir dataset\commons_greenwaste_quality `
   --model yolo11n.pt `
   --reject-person `
+  --reject-non-photo `
   --require-target-object `
   --duplicate-phash-threshold 12 `
   --confidence 0.20
@@ -116,6 +117,9 @@ The quality filter:
 
 - rejects likely near-duplicates, including some cropped/zoomed variants;
 - rejects images where YOLO detects a person when `--reject-person` is used;
+- rejects likely cartoons, drawings, illustrations, sketches, diagrams, renders,
+  icons, SVG/vector images, and other non-photo results when
+  `--reject-non-photo` is used;
 - rejects images where the expected object is not detected when
   `--require-target-object` is used;
 - records the reason for every accept/reject decision in `quality_review.csv`.
@@ -124,6 +128,14 @@ For bed collection, `--require-target-object` means the image must contain a
 YOLO-detected `bed`. A bench or shed image should therefore be rejected. Treat
 this as a review aid rather than a perfect truth source; keep a quick manual
 check before annotation.
+
+If the non-photo filter is too aggressive, rerun with:
+
+```powershell
+--reject-non-photo --no-non-photo-visual-check
+```
+
+That keeps filename/source keyword filtering but disables the visual heuristic.
 
 ## Create Grouped Train/Val/Test Splits
 

@@ -67,3 +67,22 @@ def test_quality_filter_rejects_missing_files(tmp_path: Path) -> None:
     assert accepted == []
     assert len(rejected) == 1
     assert decisions[0].reasons == "unreadable_or_missing_file"
+
+
+def test_quality_filter_rejects_non_photo_keyword(tmp_path: Path) -> None:
+    path = tmp_path / "bed_illustration.jpg"
+    Image.new("RGB", (100, 100), "white").save(path)
+    record = make_record(path, "illustration")
+
+    accepted, rejected, decisions = quality_filter_records(
+        records=[record],
+        output_dir=tmp_path / "quality",
+        reject_non_photo=True,
+        non_photo_visual_check=False,
+        copy_images=False,
+    )
+
+    assert accepted == []
+    assert len(rejected) == 1
+    assert decisions[0].decision == "reject"
+    assert "non_photo_keyword:illustration" in decisions[0].reasons

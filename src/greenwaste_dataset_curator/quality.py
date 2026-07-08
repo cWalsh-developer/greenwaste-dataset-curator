@@ -3,9 +3,10 @@ from __future__ import annotations
 import shutil
 from dataclasses import replace
 from pathlib import Path
+from urllib.parse import unquote
 
 import imagehash
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageFilter, ImageStat, UnidentifiedImageError
 
 from .models import ImageRecord, QualityDecision
 
@@ -15,6 +16,28 @@ DEFAULT_TARGET_CLASSES = {
     "chair_seating": {"chair", "bench"},
     "sofa": {"couch", "sofa"},
     "tables_desks": {"dining table", "table"},
+}
+
+NON_PHOTO_KEYWORDS = {
+    "animation",
+    "anime",
+    "cartoon",
+    "cgi",
+    "clipart",
+    "clip_art",
+    "comic",
+    "diagram",
+    "drawing",
+    "floor_plan",
+    "icon",
+    "illustration",
+    "logo",
+    "painting",
+    "render",
+    "rendered",
+    "sketch",
+    "svg",
+    "vector",
 }
 
 
@@ -76,6 +99,40 @@ def load_yolo_model(model_path: Path | None):
     return YOLO(str(model_path))
 
 
+def non_photo_keyword(record: ImageRecord, keywords: set[str] | None = None) -> str | None:
+    keywords = keywords or NON_PHOTO_KEYWORDS
+    source_text = " ".join(
+        [
+            record.query,
+            record.source_page,
+            record.image_url,
+            record.local_path,
+        ]
+    )
+    normalized = unquote(source_text).lower().replace("-", "_").replace(" ", "_")
+    for keyword in sorted(keywords):
+        if keyword in normalized:
+            return keyword
+    return None
+
+
+def looks_like_flat_art(image: Image.Image) -> bool:
+    sample = image.convert("RGB")
+    sample.thumbnail((160, 160))
+
+    colors = sample.getcolors(maxcolors=sample.width * sample.height)
+    unique_ratio = (len(colors) if colors is not None else sample.width * sample.height) / float(
+        sample.width * sample.height
+    )
+
+    grayscale = sample.convert("L")
+    edges = grayscale.filter(ImageFilter.FIND_EDGES)
+    edge_mean = ImageStat.Stat(edges).mean[0] / 255.0
+    channel_std = sum(ImageStat.Stat(sample).stddev) / 3.0
+
+    return unique_ratio < 0.08 and edge_mean > 0.06 and channel_std < 70.0
+
+
 def quality_filter_records(
     records: list[ImageRecord],
     output_dir: Path,
@@ -87,6 +144,8 @@ def quality_filter_records(
     duplicate_phash_threshold: int = 10,
     crop_duplicate_check: bool = True,
     crop_bit_error_rate: float = 0.25,
+    reject_non_photo: bool = False,
+    non_photo_visual_check: bool = True,
     copy_images: bool = False,
 ) -> tuple[list[ImageRecord], list[ImageRecord], list[QualityDecision]]:
     yolo_model = load_yolo_model(yolo_model_path)
@@ -105,6 +164,13 @@ def quality_filter_records(
         if image is None:
             reasons.append("unreadable_or_missing_file")
         else:
+            if reject_non_photo:
+                keyword = non_photo_keyword(record)
+                if keyword is not None:
+                    reasons.append(f"non_photo_keyword:{keyword}")
+                elif non_photo_visual_check and looks_like_flat_art(image):
+                    reasons.append("non_photo_visual_heuristic")
+
             phash_value = imagehash.phash(image)
             crop_hash = (
                 imagehash.crop_resistant_hash(image)

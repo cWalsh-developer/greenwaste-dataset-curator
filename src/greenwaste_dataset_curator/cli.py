@@ -79,6 +79,8 @@ def quality_filter(args: argparse.Namespace) -> None:
         duplicate_phash_threshold=args.duplicate_phash_threshold,
         crop_duplicate_check=not args.no_crop_duplicate_check,
         crop_bit_error_rate=args.crop_bit_error_rate,
+        reject_non_photo=args.reject_non_photo,
+        non_photo_visual_check=not args.no_non_photo_visual_check,
         copy_images=not args.no_copy,
     )
     write_dataclass_csv(args.output_dir / "accepted_manifest.csv", accepted, ImageRecord)
@@ -141,6 +143,12 @@ def build_parser() -> argparse.ArgumentParser:
     quality.add_argument("--confidence", type=float, default=0.25)
     quality.add_argument("--image-size", type=int, default=960)
     quality.add_argument("--reject-person", action="store_true")
+    quality.add_argument("--reject-non-photo", action="store_true")
+    quality.add_argument(
+        "--no-non-photo-visual-check",
+        action="store_true",
+        help="Only use source/filename keywords for non-photo rejection.",
+    )
     quality.add_argument("--require-target-object", action="store_true")
     quality.add_argument("--duplicate-phash-threshold", type=int, default=10)
     quality.add_argument("--no-crop-duplicate-check", action="store_true")
