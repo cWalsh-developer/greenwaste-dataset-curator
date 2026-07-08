@@ -6,7 +6,8 @@ from pathlib import Path
 
 from .commons import CommonsCollector
 from .manifest import read_image_manifest, write_dataclass_csv
-from .models import DetectorProposal, ImageRecord
+from .models import DetectorProposal, ImageRecord, QualityDecision
+from .quality import quality_filter_records
 from .splitting import assign_grouped_splits, write_split_dataset
 from .yolo import generate_yolo_proposals
 
@@ -65,6 +66,29 @@ def yolo_proposals(args: argparse.Namespace) -> None:
     print(f"Wrote {len(proposals)} proposal(s) to {args.output_csv}")
 
 
+def quality_filter(args: argparse.Namespace) -> None:
+    records = read_image_manifest(args.manifest)
+    accepted, rejected, decisions = quality_filter_records(
+        records=records,
+        output_dir=args.output_dir,
+        yolo_model_path=args.model,
+        confidence=args.confidence,
+        image_size=args.image_size,
+        reject_person=args.reject_person,
+        require_target_object=args.require_target_object,
+        duplicate_phash_threshold=args.duplicate_phash_threshold,
+        crop_duplicate_check=not args.no_crop_duplicate_check,
+        crop_bit_error_rate=args.crop_bit_error_rate,
+        copy_images=not args.no_copy,
+    )
+    write_dataclass_csv(args.output_dir / "accepted_manifest.csv", accepted, ImageRecord)
+    write_dataclass_csv(args.output_dir / "rejected_manifest.csv", rejected, ImageRecord)
+    write_dataclass_csv(args.output_dir / "quality_review.csv", decisions, QualityDecision)
+    print(f"Accepted image(s): {len(accepted)}")
+    print(f"Rejected image(s): {len(rejected)}")
+    print(f"Quality review: {args.output_dir / 'quality_review.csv'}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="greenwaste-curator",
@@ -101,6 +125,28 @@ def build_parser() -> argparse.ArgumentParser:
     proposals.add_argument("--confidence", type=float, default=0.25)
     proposals.add_argument("--image-size", type=int, default=960)
     proposals.set_defaults(func=yolo_proposals)
+
+    quality = subparsers.add_parser(
+        "quality-filter",
+        help="Filter collected images for duplicates, people, and wrong target objects",
+    )
+    quality.add_argument("--manifest", type=Path, required=True)
+    quality.add_argument("--output-dir", type=Path, required=True)
+    quality.add_argument(
+        "--model",
+        type=Path,
+        default=None,
+        help="Optional YOLO model for semantic checks, e.g. yolo11n.pt",
+    )
+    quality.add_argument("--confidence", type=float, default=0.25)
+    quality.add_argument("--image-size", type=int, default=960)
+    quality.add_argument("--reject-person", action="store_true")
+    quality.add_argument("--require-target-object", action="store_true")
+    quality.add_argument("--duplicate-phash-threshold", type=int, default=10)
+    quality.add_argument("--no-crop-duplicate-check", action="store_true")
+    quality.add_argument("--crop-bit-error-rate", type=float, default=0.25)
+    quality.add_argument("--no-copy", action="store_true")
+    quality.set_defaults(func=quality_filter)
 
     return parser
 

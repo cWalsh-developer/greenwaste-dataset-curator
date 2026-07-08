@@ -33,3 +33,13 @@ class DetectorProposal:
     y_max: float
     image_width: int
     image_height: int
+
+
+@dataclass(frozen=True)
+class QualityDecision:
+    local_path: str
+    category: str
+    decision: str
+    reasons: str
+    detected_classes: str
+    duplicate_of: str

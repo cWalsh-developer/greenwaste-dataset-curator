@@ -81,6 +81,50 @@ If Wikimedia returns too many request errors, reduce `--images-per-query` and
 increase `--delay-seconds`. The collector automatically waits and retries when
 the server returns HTTP 429 rate-limit responses.
 
+## Filter Bad Search Results
+
+Keyword search is intentionally broad, so some collected images may be wrong:
+for example beds with people lying on them, cropped/zoomed duplicates, benches
+returned for bed queries, or unrelated buildings. Run a quality filter before
+manual annotation:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e .[yolo]
+
+.\.venv\Scripts\greenwaste-curator.exe quality-filter `
+  --manifest dataset\commons_greenwaste\manifest.csv `
+  --output-dir dataset\commons_greenwaste_quality `
+  --model yolo11n.pt `
+  --reject-person `
+  --require-target-object `
+  --duplicate-phash-threshold 12 `
+  --confidence 0.20
+```
+
+This creates:
+
+```text
+dataset/commons_greenwaste_quality/
+  accepted/
+  rejected/
+  accepted_manifest.csv
+  rejected_manifest.csv
+  quality_review.csv
+```
+
+The quality filter:
+
+- rejects likely near-duplicates, including some cropped/zoomed variants;
+- rejects images where YOLO detects a person when `--reject-person` is used;
+- rejects images where the expected object is not detected when
+  `--require-target-object` is used;
+- records the reason for every accept/reject decision in `quality_review.csv`.
+
+For bed collection, `--require-target-object` means the image must contain a
+YOLO-detected `bed`. A bench or shed image should therefore be rejected. Treat
+this as a review aid rather than a perfect truth source; keep a quick manual
+check before annotation.
+
 ## Create Grouped Train/Val/Test Splits
 
 ```powershell
