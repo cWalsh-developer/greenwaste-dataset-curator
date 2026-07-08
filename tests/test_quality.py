@@ -3,7 +3,10 @@ from pathlib import Path
 from PIL import Image
 
 from greenwaste_dataset_curator.models import ImageRecord
-from greenwaste_dataset_curator.quality import quality_filter_records
+from greenwaste_dataset_curator.quality import (
+    greenwaste_categories_from_classes,
+    quality_filter_records,
+)
 
 
 def make_record(path: Path, source_id: str) -> ImageRecord:
@@ -86,3 +89,46 @@ def test_quality_filter_rejects_non_photo_keyword(tmp_path: Path) -> None:
     assert len(rejected) == 1
     assert decisions[0].decision == "reject"
     assert "non_photo_keyword:illustration" in decisions[0].reasons
+
+
+def test_greenwaste_categories_from_detector_classes() -> None:
+    categories = greenwaste_categories_from_classes({"bed", "couch", "person"})
+
+    assert categories == {"beds_mattresses", "sofa"}
+
+
+def test_quality_filter_reclassifies_single_detected_category(monkeypatch, tmp_path: Path) -> None:
+    path = tmp_path / "sofa_folder_but_bed.jpg"
+    Image.new("RGB", (100, 100), "white").save(path)
+    record = make_record(path, "misfiled")
+    record = ImageRecord(
+        **{
+            **record.__dict__,
+            "category": "sofa",
+        }
+    )
+
+    monkeypatch.setattr(
+        "greenwaste_dataset_curator.quality.load_yolo_model",
+        lambda model_path: object(),
+    )
+    monkeypatch.setattr(
+        "greenwaste_dataset_curator.quality.detect_classes",
+        lambda model, image_path, confidence, image_size: {"bed"},
+    )
+
+    accepted, rejected, decisions = quality_filter_records(
+        records=[record],
+        output_dir=tmp_path / "quality",
+        yolo_model_path=Path("fake.pt"),
+        require_target_object=True,
+        reclassify_mismatched_category=True,
+        copy_images=False,
+    )
+
+    assert rejected == []
+    assert len(accepted) == 1
+    assert accepted[0].category == "beds_mattresses"
+    assert decisions[0].decision == "reclassify"
+    assert decisions[0].original_category == "sofa"
+    assert decisions[0].output_category == "beds_mattresses"

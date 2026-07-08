@@ -81,6 +81,7 @@ def quality_filter(args: argparse.Namespace) -> None:
         crop_bit_error_rate=args.crop_bit_error_rate,
         reject_non_photo=args.reject_non_photo,
         non_photo_visual_check=not args.no_non_photo_visual_check,
+        reclassify_mismatched_category=args.reclassify_mismatched_category,
         copy_images=not args.no_copy,
     )
     write_dataclass_csv(args.output_dir / "accepted_manifest.csv", accepted, ImageRecord)
@@ -150,6 +151,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Only use source/filename keywords for non-photo rejection.",
     )
     quality.add_argument("--require-target-object", action="store_true")
+    quality.add_argument(
+        "--reclassify-mismatched-category",
+        action="store_true",
+        help=(
+            "If the expected category is not detected but exactly one other "
+            "GreenWaste category is detected, move the image into that category."
+        ),
+    )
     quality.add_argument("--duplicate-phash-threshold", type=int, default=10)
     quality.add_argument("--no-crop-duplicate-check", action="store_true")
     quality.add_argument("--crop-bit-error-rate", type=float, default=0.25)

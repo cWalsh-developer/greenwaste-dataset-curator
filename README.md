@@ -98,6 +98,7 @@ manual annotation:
   --reject-person `
   --reject-non-photo `
   --require-target-object `
+  --reclassify-mismatched-category `
   --duplicate-phash-threshold 12 `
   --confidence 0.20
 ```
@@ -122,12 +123,22 @@ The quality filter:
   `--reject-non-photo` is used;
 - rejects images where the expected object is not detected when
   `--require-target-object` is used;
+- moves images into the detected GreenWaste category when
+  `--reclassify-mismatched-category` is used and exactly one alternative
+  category is detected;
 - records the reason for every accept/reject decision in `quality_review.csv`.
 
 For bed collection, `--require-target-object` means the image must contain a
 YOLO-detected `bed`. A bench or shed image should therefore be rejected. Treat
 this as a review aid rather than a perfect truth source; keep a quick manual
 check before annotation.
+
+If a search result lands in the wrong folder but clearly belongs to another
+GreenWaste category, `--reclassify-mismatched-category` places it under the
+detected category in `accepted/` and updates `accepted_manifest.csv`. For
+example, a bed collected under `sofa` can be moved to `beds_mattresses`.
+Ambiguous images with multiple detected GreenWaste categories are rejected for
+manual review rather than automatically moved.
 
 If the non-photo filter is too aggressive, rerun with:
 

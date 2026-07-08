@@ -38,8 +38,10 @@ class DetectorProposal:
 @dataclass(frozen=True)
 class QualityDecision:
     local_path: str
-    category: str
+    original_category: str
+    output_category: str
     decision: str
     reasons: str
     detected_classes: str
+    detected_categories: str
     duplicate_of: str
