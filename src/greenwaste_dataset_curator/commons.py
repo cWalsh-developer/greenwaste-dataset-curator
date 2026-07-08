@@ -21,8 +21,10 @@ class CommonsCollector:
         output_dir: Path,
         min_width: int = 640,
         min_height: int = 480,
-        delay_seconds: float = 0.5,
+        delay_seconds: float = 2.0,
         phash_threshold: int = 4,
+        max_retries: int = 5,
+        backoff_seconds: float = 5.0,
         user_agent: str = "GreenWasteDatasetCurator/0.1 academic image dataset research",
     ) -> None:
         self.output_dir = output_dir
@@ -30,10 +32,35 @@ class CommonsCollector:
         self.min_width = min_width
         self.min_height = min_height
         self.delay_seconds = delay_seconds
+        self.max_retries = max_retries
+        self.backoff_seconds = backoff_seconds
         self.dedupe = DedupeIndex(phash_threshold=phash_threshold)
 
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": user_agent})
+
+    def get_with_backoff(self, url: str, **kwargs) -> requests.Response:
+        for attempt in range(1, self.max_retries + 1):
+            response = self.session.get(url, **kwargs)
+            if response.status_code != 429:
+                response.raise_for_status()
+                return response
+
+            retry_after = response.headers.get("Retry-After")
+            if retry_after is not None and retry_after.isdigit():
+                wait_seconds = float(retry_after)
+            else:
+                wait_seconds = self.backoff_seconds * attempt
+
+            print(
+                "Rate limited by server "
+                f"(HTTP 429). Waiting {wait_seconds:.1f}s before retry "
+                f"{attempt}/{self.max_retries}."
+            )
+            time.sleep(wait_seconds)
+
+        response.raise_for_status()
+        return response
 
     def search(self, query: str, limit: int = 50) -> Iterator[dict]:
         params = {
@@ -46,15 +73,13 @@ class CommonsCollector:
             "prop": "imageinfo",
             "iiprop": "url|size|mime|extmetadata",
         }
-        response = self.session.get(API_URL, params=params, timeout=30)
-        response.raise_for_status()
+        response = self.get_with_backoff(API_URL, params=params, timeout=30)
         pages = response.json().get("query", {}).get("pages", {})
         yield from pages.values()
 
     def download_image(self, url: str) -> tuple[bytes, Image.Image] | None:
         try:
-            response = self.session.get(url, timeout=45)
-            response.raise_for_status()
+            response = self.get_with_backoff(url, timeout=45)
             raw = response.content
             image = Image.open(io.BytesIO(raw))
             image.load()

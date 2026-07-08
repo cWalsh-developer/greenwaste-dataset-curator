@@ -56,7 +56,10 @@ For YOLO proposal generation:
   --output-dir dataset\commons_greenwaste `
   --images-per-query 25 `
   --min-width 640 `
-  --min-height 480
+  --min-height 480 `
+  --delay-seconds 3 `
+  --max-retries 8 `
+  --backoff-seconds 10
 ```
 
 Output:
@@ -73,6 +76,10 @@ dataset/commons_greenwaste/
 ```
 
 The `manifest.csv` is the important audit trail. Keep it with the dataset.
+
+If Wikimedia returns too many request errors, reduce `--images-per-query` and
+increase `--delay-seconds`. The collector automatically waits and retries when
+the server returns HTTP 429 rate-limit responses.
 
 ## Create Grouped Train/Val/Test Splits
 

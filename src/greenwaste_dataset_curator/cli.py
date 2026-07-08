@@ -24,6 +24,8 @@ def collect_commons(args: argparse.Namespace) -> None:
         min_height=args.min_height,
         delay_seconds=args.delay_seconds,
         phash_threshold=args.phash_threshold,
+        max_retries=args.max_retries,
+        backoff_seconds=args.backoff_seconds,
     )
     query_map = load_query_config(args.query_config)
     records = collector.collect(query_map=query_map, images_per_query=args.images_per_query)
@@ -76,8 +78,10 @@ def build_parser() -> argparse.ArgumentParser:
     collect.add_argument("--images-per-query", type=int, default=25)
     collect.add_argument("--min-width", type=int, default=640)
     collect.add_argument("--min-height", type=int, default=480)
-    collect.add_argument("--delay-seconds", type=float, default=0.5)
+    collect.add_argument("--delay-seconds", type=float, default=2.0)
     collect.add_argument("--phash-threshold", type=int, default=4)
+    collect.add_argument("--max-retries", type=int, default=5)
+    collect.add_argument("--backoff-seconds", type=float, default=5.0)
     collect.set_defaults(func=collect_commons)
 
     split = subparsers.add_parser("split", help="Create grouped train/val/test split")
